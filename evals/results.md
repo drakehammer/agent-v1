@@ -1,6 +1,6 @@
 # Resultados de Evaluación
 Modelo usado: `openrouter/free`
-Fecha: 2026-09-30 10:52:42
+Fecha: 2026-09-30 10:56:49
 
 ## Comparación Triage vs Baseline (18 tests)
 - **Triage (LLM)**: 0/18 = 0.00%
