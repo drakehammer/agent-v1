@@ -27,7 +27,6 @@ def run_evals():
         try:
             with open("evals/cases.json", encoding="utf-8") as f:
                 cases = json.load(f)
-            from agents.baseline import triage_reports as run_baseline
             total_tests = 0
             correct_baseline = 0
             for case in cases:
