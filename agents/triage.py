@@ -2,13 +2,15 @@
 """Agente de triage con ciclo manual de tool calling (OpenRouter + openai SDK)."""
 
 from dotenv import load_dotenv
-load_dotenv()
 import json
 import os
 import time
 import sys
 from datetime import datetime
 from pathlib import Path
+
+ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(dotenv_path=ENV_FILE, override=False)
 
 from openai import OpenAI
 
@@ -66,10 +68,10 @@ def resolve_report_path(path_arg: str) -> Path:
 
 
 def run_agent(report_path_str: str) -> tuple[dict, dict]:
-    api_key = os.environ.get("OPENROUTER_API_KEY")
+    api_key = (os.environ.get("OPENROUTER_API_KEY") or "").strip()
     model = os.environ.get("AGENT_MODEL", "openrouter/free")
     if not api_key:
-        raise ValueError("OPENROUTER_API_KEY no está configurada en variables de entorno.")
+        raise ValueError("OPENROUTER_API_KEY no está configurada. Crea .env en la raíz del repositorio o define la variable de entorno.")
 
     client = OpenAI(
         api_key=api_key,

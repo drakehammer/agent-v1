@@ -5,11 +5,13 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=ENV_FILE, override=False)
+
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from dotenv import load_dotenv
-load_dotenv()
 
 from agents.triage import run_agent as run_triage
 from agents.baseline import triage_reports as run_baseline
@@ -36,6 +38,7 @@ def run_evals():
     total_tool_calls_triage = 0
     total_time_triage = 0.0
     execution_errors_global = []
+    execution_error_count = 0
 
     for case in cases:
         # Baseline
@@ -44,6 +47,7 @@ def run_evals():
         try:
             triage_output, trace_info = run_triage(case["report"])
         except Exception as exc:
+            execution_error_count += 1
             triage_output = {"results": [{"test_name": case["report"], "category": "execution_error", "confidence": 0, "reason": "Ejecución fallida: " + str(exc), "evidence": [str(exc)]}], "unknown": []}
             trace_info = {"iterations": 0, "tool_calls": [], "total_time": 0.0, "execution_error": str(exc)}
 
@@ -160,9 +164,9 @@ def run_evals():
     results_path = Path("evals/results.md")
     results_path.parent.mkdir(parents=True, exist_ok=True)
 
-    real_eval = total_tool_calls_triage > 0 and total_time_triage > 0
-    accuracy_text_triage = f"{correct_triage}/{total_tests} = {accuracy_triage:.2%}" if real_eval else "No calculado (evaluación no real: tool_calls == 0 o time == 0)"
-    accuracy_text_baseline = f"{correct_baseline}/{total_tests} = {accuracy_baseline:.2%}" if real_eval else "No calculado"
+    real_eval = execution_error_count == 0 and total_tool_calls_triage > 0 and total_time_triage > 0
+    accuracy_text_triage = f"{correct_triage}/{total_tests} = {accuracy_triage:.2%}" if real_eval else "No calculado (evaluación no real: hay errores de ejecución, tool_calls == 0 o time == 0)"
+    accuracy_text_baseline = f"{correct_baseline}/{total_tests} = {accuracy_baseline:.2%}"
 
     lines = [
         "# Resultados de Evaluación",
@@ -179,7 +183,7 @@ def run_evals():
         "",
     ]
     if not real_eval:
-        lines.append("> WARNING: Evaluacion no considerada real: no se registraron llamadas a herramientas (tool_calls == 0) o tiempo == 0.")
+        lines.append("> WARNING: Evaluacion del LLM no considerada real: hay errores de ejecución, no se registraron llamadas a herramientas (tool_calls == 0) o el tiempo total es 0.")
         lines.append("")
     if execution_errors_global:
         lines.append("## Errores de ejecución")
