@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ApiTest" tests="1" failures="1">
+  <testcase name="testGetUser" classname="ApiTest" time="0.05">
+    <failure message="expected:&lt;200&gt; but was:&lt;404&gt;" type="org.junit.ComparisonFailure">
+      org.junit.ComparisonFailure: expected:&lt;200&gt; but was:&lt;404&gt;
+        at com.example.ApiTest.testGetUser(ApiTest.java:42)
+    </failure>
+  </testcase>
+</testsuite>

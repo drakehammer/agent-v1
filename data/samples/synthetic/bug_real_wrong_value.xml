@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ApiTest" tests="1" failures="1" time="0.03">
+  <testcase name="testGetUser" classname="ApiTest" time="0.03">
+    <failure message="expected value 5 but got 3" type="AssertionError">
+      java.lang.AssertionError: expected:&lt;5&gt; but was:&lt;3&gt;
+    </failure>
+  </testcase>
+</testsuite>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ApiTest" tests="3" failures="1" time="0.03">
+  <testcase name="testRaceCondition" classname="ApiTest" time="0.01">
+    <error message="ConcurrentModificationException" type="java.util.ConcurrentModificationException">
+      java.util.ConcurrentModificationException
+    </error>
+  </testcase>
+</testsuite>

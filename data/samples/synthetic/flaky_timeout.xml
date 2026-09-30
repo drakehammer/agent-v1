@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ApiTest" tests="1" failures="1" time="0.08">
+  <testcase name="testCreateUser" classname="ApiTest" time="0.08">
+    <failure message="Timeout after 30000ms" type="org.junit.runners.model.TestTimedOutException">
+      org.junit.runners.model.TestTimedOutException: test timed out after 30000 milliseconds
+    </failure>
+  </testcase>
+</testsuite>

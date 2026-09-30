@@ -1,0 +1,7 @@
+.env
+traces/
+output/
+__pycache__/
+*.pyc
+.idea/
+.vscode/

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ApiTest" tests="2" failures="1" time="0.05">
+  <system-out>Previous test state: OK</system-out>
+  <testcase name="testDependent" classname="ApiTest" time="0.05">
+    <failure message="expected state READY but got PENDING" type="AssertionError">
+      AssertionError: expected:<READY> but was:<PENDING>
+    </failure>
+  </testcase>
+</testsuite>

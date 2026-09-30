@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ApiTest" tests="1" errors="1" time="0.02">
+  <testcase name="testGetUser" classname="ApiTest" time="0.02">
+    <error message="Connection refused" type="java.net.ConnectException">
+      java.net.ConnectException: Connection refused (connect failed)
+    </error>
+  </testcase>
+</testsuite>
