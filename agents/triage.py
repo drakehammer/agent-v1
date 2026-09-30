@@ -23,6 +23,15 @@ from tools.write_summary import write_summary
 MAX_ITERATIONS = 10
 MAX_RETRIES = 3
 
+SYSTEM_PROMPT = (
+    "Estrategia explícita (seguir en orden): 1. Inspect the report. 2. Identify failed tests. 3. Gather relevant evidence. 4. Inspect test source when useful. 5. Distinguish facts from hypotheses. 6. Do not infer flaky behavior without evidence. 7. Do not infer environment failures from HTTP codes alone. 8. Prefer UNKNOWN when evidence is insufficient. 9. Provide evidence for every diagnosis. 10. Return only the required structured output. "
+    "Política de confianza: la confianza representa la confianza en la evidencia disponible, no en una suposición. Un UNKNOWN de alta confianza es válido cuando la evidencia muestra claramente que los datos disponibles son insuficientes para determinar la causa raíz. "
+    "Clasifica BUG_REAL solo con evidencia razonable. FLAKY solo con indicadores concretos (timeout/intermitencia, orden, referencias temporales, comportamiento no determinista, histórico, resultados distintos, race). AMBIENTE solo con indicadores de infraestructura (DNS, conexión, auth, servicio, 5xx REALMENTE de infra). No convertir 401/503 automáticamente en AMBIENTE. UNKNOWN es válido cuando hay varias explicaciones plausibles o falta contexto. "
+    "No confundir patrones con evidencia (ej: 'expected true but was false' no define categoría por sí solo). "
+    "Genera una respuesta final estructurada como JSON con 'results' (lista de objetos con test_name, category, confidence, reason, evidence). "
+    "Incluye un campo 'summary' breve sobre el diagnóstico general. No uses regex ni texto libre fuera del JSON estructurado."
+)
+
 
 def call_api_with_retry(client: OpenAI, model: str, messages: list, tools: list) -> dict:
     last_exc = None
@@ -84,14 +93,7 @@ def run_agent(report_path_str: str) -> tuple[dict, dict]:
     messages = [
         {
             "role": "system",
-            "content": (
-                "Estrategia explícita (seguir en orden): 1. Inspect the report. 2. Identify failed tests. 3. Gather relevant evidence. 4. Inspect test source when useful. 5. Distinguish facts from hypotheses. 6. Do not infer flaky behavior without evidence. 7. Do not infer environment failures from HTTP codes alone. 8. Prefer UNKNOWN when evidence is insufficient. 9. Provide evidence for every diagnosis. 10. Return only the required structured output. "
-                "Política de confianza: la confianza representa la confianza en la evidencia disponible, no en una suposición. Un UNKNOWN de alta confianza es válido cuando la evidencia muestra claramente que los datos disponibles son insuficientes para determinar la causa raíz. "
-                "Clasifica BUG_REAL solo con evidencia razonable. FLAKY solo con indicadores concretos (timeout/intermitencia, orden, referencias temporales, comportamiento no determinista, histórico, resultados distintos, race). AMBIENTE solo con indicadores de infraestructura (DNS, conexión, auth, servicio, 5xx REALMENTE de infra). No convertir 401/503 automáticamente en AMBIENTE. UNKNOWN es válido cuando hay varias explicaciones plausibles o falta contexto.",
-                "No confundir patrones con evidencia (ej: 'expected true but was false' no define categoría por sí solo). Confianza refleja confianza en la evidencia disponible, no en una suposición. Un UNKNOWN de alta confianza es válido si los datos son claramente insuficientes."
-                "Genera una respuesta final estructurada como JSON con 'results' (lista de objetos con test_name, category, confidence, reason, evidence). "
-                "Incluye un campo 'summary' breve sobre el diagnóstico general. No uses regex ni texto libre fuera del JSON estructurado."
-            ),
+            "content": SYSTEM_PROMPT,
         },
         {"role": "user", "content": f"Analiza el reporte: {str(full_report_path)}. Recopila evidencia. Separa Evidence (hechos del reporte) de Reasoning (razonamiento paso a paso). Devuelve JSON con results (test_name, category, confidence, reason, evidence) según corresponda."},
     ]

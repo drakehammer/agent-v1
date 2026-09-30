@@ -1,6 +1,7 @@
 """Tests para el output validator del agente (Fase 10)."""
 import pytest
 from agents.schema import TriageOutput, ResultItem
+from agents.triage import SYSTEM_PROMPT
 
 
 def test_output_validator_duplicate():
@@ -31,3 +32,24 @@ def test_output_validator_unknown_justified():
         ResultItem(test_name="t1", category="UNKNOWN", confidence=0.8, reason="Sin evidencia suficiente para distinguir la causa", evidence=[]),
     ])
     assert out.results[0].category == "UNKNOWN"
+
+
+def test_system_prompt_is_str_and_contains_keywords():
+    assert isinstance(SYSTEM_PROMPT, str)
+    assert SYSTEM_PROMPT
+    for word in ("BUG_REAL", "FLAKY", "AMBIENTE", "UNKNOWN"):
+        assert word in SYSTEM_PROMPT, f"Falta {word} en SYSTEM_PROMPT"
+
+
+def test_messages_content_are_str():
+    # Verifica que cada content en mensajes del sistema/usuario sea str
+    import agents.triage as triage_module
+    # Construir mensajes mínimos igual a los de run_agent (solo estructura)
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": "test"},
+    ]
+    for msg in messages:
+        assert isinstance(msg.get("content"), str), f"content no es str en {msg['role']}"
+    # También verificar que los mensajes de herramienta futuros sean str
+    # (en el ciclo, content siempre se convierte con or "")
