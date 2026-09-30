@@ -11,7 +11,7 @@ class SecurityError(ValueError):
 
 
 def validate_path(path: str, base_dir: Path) -> Path:
-    """Valida que la ruta resuelta esté dentro de base_dir.
+    r"""Valida que la ruta resuelta esté dentro de base_dir.
 
     Bloquea path traversal (../, ..\) y enlaces simbólicos que apunten
     fuera de base_dir.
