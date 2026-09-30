@@ -51,29 +51,7 @@ def call_api_with_retry(client: OpenAI, model: str, messages: list, tools: list)
     raise last_exc
 
 
-def resolve_report_path(path_arg: str) -> Path:
-    """Resuelve rutas de reporte con soporte para múltiples formatos."""
-    # Intentar con path absoluto o relativo directo
-    p = Path(path_arg)
-    if p.exists():
-        return p.resolve()
-    # Intentar con data/samples/synthetic/
-    synthetic_dir = Path("data/samples/synthetic")
-    synthetic_path = synthetic_dir / Path(path_arg)
-    if synthetic_path.exists():
-        return synthetic_path.resolve()
-    synthetic_path2 = synthetic_dir / p.name
-    if synthetic_path2.exists():
-        return synthetic_path2.resolve()
-    # Intentar con data/samples/real/
-    real_dir = Path("data/samples/real")
-    real_path = real_dir / Path(path_arg)
-    if real_path.exists():
-        return real_path.resolve()
-    # Intentar con nombre solo
-    if synthetic_dir.exists() and (synthetic_dir / p.name).exists():
-        return (synthetic_dir / p.name).resolve()
-    raise FileNotFoundError(f"No se encontró el reporte: {path_arg}")
+from tools.paths import resolve_path as resolve_report_path
 
 
 def run_agent(report_path_str: str) -> tuple[dict, dict]:

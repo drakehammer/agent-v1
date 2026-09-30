@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from agents.triage import run_agent as run_triage
 from agents.baseline import triage_reports as run_baseline
+from tools.paths import resolve_path
 
 
 def run_evals():
@@ -69,8 +70,9 @@ def run_evals():
     execution_error_count = 0
 
     for case in cases:
-        # Baseline
-        baseline_output = run_baseline([case["report"]])
+        # Baseline (siempre, sin API)
+        report_path_resolved = resolve_path(case["report"])
+        baseline_output = run_baseline([str(report_path_resolved)])
         # Triage
         try:
             triage_output, trace_info = run_triage(case["report"])
@@ -152,6 +154,11 @@ def run_evals():
     from collections import Counter
     # Métricas adicionales
     categories = ["BUG_REAL", "FLAKY", "AMBIENTE", "UNKNOWN"]
+    # Tests sin predicción (None) de LLM, incluyendo errores de ejecución
+    none_triage = sum(
+        1 for case in cases for k in case.get("expected", {})
+        if (triage_map.get(k) is None or triage_map.get(k) == "execution_error")
+    )
     # Confusion matrices
     def build_matrix(conf_dict):
         return {cat: {exp: conf_dict.get(cat, {}).get(exp, 0) for exp in categories} for cat in categories}
@@ -211,8 +218,10 @@ def run_evals():
         "",
     ]
     if not real_eval:
-        lines.append("> WARNING: Evaluacion del LLM no considerada real: hay errores de ejecución, no se registraron llamadas a herramientas (tool_calls == 0) o el tiempo total es 0.")
+        lines.append("> WARNING: Evaluacion del LLM no considerada real: hay errores de ejecución (" + str(execution_error_count) + "), no se registraron llamadas a herramientas (tool_calls == 0) o el tiempo total es 0.")
+        lines.append("> LLM marcado como 'No calculado' por errores de ejecución o falta de datos realistas.")
         lines.append("")
+    lines.append(f"> Tests sin predicción (None) de LLM: se cuentan los faltantes por caso; no se ocultan en silencio.")
     if execution_errors_global:
         lines.append("## Errores de ejecución")
         lines.append("| Caso | Test | Razón |")

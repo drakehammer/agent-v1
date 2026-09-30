@@ -6,6 +6,7 @@ from pathlib import Path
 from defusedxml import ElementTree as DefusedET
 
 from tools.security import DATA_DIR, SecurityError, validate_path
+from tools.paths import resolve_path
 
 TOOL_SCHEMA = {
     "type": "function",
@@ -32,25 +33,12 @@ TOOL_SCHEMA = {
 
 
 def _resolve_path(path: str) -> Path:
-    # Resolver rutas: 'synthetic/x.xml', 'x.xml', 'data/samples/synthetic/x.xml'
-    candidates = [
-        Path(path),
-        Path("data/samples/synthetic") / path,
-        Path("data/samples/real") / path,
-        Path("data/samples/synthetic") / Path(path).name,
-        Path("data/samples/real") / Path(path).name,
-    ]
-    for c in candidates:
-        resolved = c.resolve()
-        if resolved.exists():
-            # Validar que esté dentro de DATA_DIR
-            try:
-                resolved.relative_to(DATA_DIR.resolve())
-                return resolved
-            except ValueError:
-                continue
-    # Si no se encuentra, lanzar excepción
-    raise SecurityError(f"Archivo no encontrado (o fuera de datos): {path}")
+    resolved = resolve_path(path)
+    try:
+        resolved.relative_to(DATA_DIR.resolve())
+    except ValueError as exc:
+        raise SecurityError(f"Archivo fuera de datos: '{path}'") from exc
+    return resolved
 
 
 def read_report(path: str) -> list[dict]:
