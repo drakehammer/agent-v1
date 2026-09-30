@@ -27,7 +27,7 @@ def test_read_test_truncates():
     test_file.write_text(content, encoding="utf-8")
 
     result = read_test("samples/synthetic/test_large.log")
-    assert len(result) <= 10000 + 50  # + margen para truncado
+    assert len(result) <= 10200  # MAX_CHARS + header (~60) + mensaje truncado
 
     test_file.unlink()
 

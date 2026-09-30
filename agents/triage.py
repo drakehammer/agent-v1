@@ -10,7 +10,7 @@ from pathlib import Path
 
 from openai import OpenAI
 
-from agents.schema import TriageOutput, ResultItem, UnknownItem
+from agents.schema import TriageOutput, ResultItem
 from tools import TOOL_SCHEMAS
 from tools.read_report import read_report
 from tools.read_test import read_test
@@ -102,6 +102,14 @@ def run_agent(report_path_str: str) -> tuple[dict, dict]:
         "total_time": 0.0,
         "output": None,
     }
+
+    # Resolver fallos del reporte para validación de cantidad exacta y fallback
+    expected_test_names = set()
+    try:
+        failed_report = read_report(str(report_path_str))
+        expected_test_names = {f.get("test") for f in failed_report if f.get("test")}
+    except Exception:
+        pass
 
     start_time = time.time()
 
@@ -253,7 +261,6 @@ def run_agent(report_path_str: str) -> tuple[dict, dict]:
             })
         trace["output"] = json.dumps({
             "results": fallback_results if fallback_results else [{"test_name": "unknown", "category": "UNKNOWN", "confidence": 0.0, "reason": "Límite de iteraciones alcanzado.", "evidence": []}],
-            "unknown": [],
         }, ensure_ascii=False)
 
     trace["total_time"] = time.time() - start_time
@@ -265,14 +272,6 @@ def run_agent(report_path_str: str) -> tuple[dict, dict]:
     trace_path = traces_dir / f"{timestamp}.json"
     with open(trace_path, "w", encoding="utf-8") as f:
         json.dump(trace, f, indent=2, ensure_ascii=False)
-
-    # Resolver fallos del reporte para validación de cantidad exacta
-    expected_test_names = set()
-    try:
-        failed_report = read_report(str(report_path_str))
-        expected_test_names = {f.get("test") for f in failed_report if f.get("test")}
-    except Exception:
-        pass
 
     # --- Validación estructurada del output final (sin regex genérica) ---
     raw_output = trace.get("output") or "{}"
@@ -321,13 +320,10 @@ def run_agent(report_path_str: str) -> tuple[dict, dict]:
         parsed_output = {}
     if "results" not in parsed_output:
         parsed_output["results"] = []
-    if "unknown" not in parsed_output:
-        parsed_output["unknown"] = []
 
     # Normalización de resultados según schema exacto
     try:
         results_raw = parsed_output.get("results", [])
-        unknown_raw = parsed_output.get("unknown", [])
         if isinstance(results_raw, list):
             normalized_results = []
             for item in results_raw:
@@ -361,26 +357,6 @@ def run_agent(report_path_str: str) -> tuple[dict, dict]:
             parsed_output["results"] = normalized_results
         else:
             parsed_output["results"] = [{"test_name": "unknown", "category": "UNKNOWN", "confidence": 0.0, "reason": "results no es lista", "evidence": [str(results_raw)]}]
-
-        if isinstance(unknown_raw, list):
-            normalized_unknown = []
-            for item in unknown_raw:
-                if isinstance(item, dict):
-                    test_name = item.get("test", item.get("test_name", "unknown"))
-                    reason = item.get("reason", "Sin razón")
-                    evidence_raw = item.get("evidence", [])
-                    if isinstance(evidence_raw, str):
-                        evidence_list = [evidence_raw] if evidence_raw.strip() else []
-                    elif isinstance(evidence_raw, list):
-                        evidence_list = [str(e) for e in evidence_raw]
-                    else:
-                        evidence_list = [str(evidence_raw)]
-                    normalized_unknown.append({"test": str(test_name) if test_name else "unknown", "reason": reason if isinstance(reason, str) else "Sin razón", "evidence": evidence_list})
-                else:
-                    normalized_unknown.append({"test": "unknown", "reason": "Item malformado", "evidence": [str(item)]})
-            parsed_output["unknown"] = normalized_unknown
-        else:
-            parsed_output["unknown"] = [{"test": "unknown", "reason": "unknown no es lista", "evidence": [str(unknown_raw)]}]
 
         # Validar duplicados
         result_names = [r.get("test_name") for r in parsed_output.get("results", [])]

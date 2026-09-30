@@ -2,13 +2,18 @@
 
 ## Qué hace
 
-Clasifica cada test fallido de un reporte JUnit XML (formato Maven Surefire) en una de tres categorías:
+Clasifica cada test fallido de un reporte JUnit XML (formato Maven Surefire) en una de cuatro categorías:
+
+- **BUG_REAL**
+- **FLAKY**
+- **AMBIENTE**
+- **UNKNOWN** (evidencia insuficiente o varias explicaciones plausibles)
 
 - **BUG_REAL**: Asserción falla por valor incorrecto del sistema (404 en lugar de 200, campo null, etc.). Reproducible y consistente.
 - **FLAKY**: Fallo intermitente o dependiente del tiempo/orden (timeouts, race conditions, datos compartidos).
 - **AMBIENTE**: Problemas de infraestructura (DNS, conexión rechazada, credenciales expiradas, 503, servicio caído).
 
-Genera un JSON valido por test (`test`, `category`, `confidence`, `reason`, `evidence`) y también un resumen Markdown (`output/summary.md`).
+Genera un JSON estructurado por test (`test_name`, `category`, `confidence`, `reason`, `evidence` como lista) sin estructura duplicada `unknown`; `UNKNOWN` es una categoría válida dentro de `results`.
 
 ## Arquitectura (Mermaid)
 

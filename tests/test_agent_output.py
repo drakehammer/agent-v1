@@ -1,6 +1,6 @@
 """Tests para el output validator del agente (Fase 10)."""
 import pytest
-from agents.schema import TriageOutput, ResultItem, UnknownItem
+from agents.schema import TriageOutput, ResultItem
 
 
 def test_output_validator_duplicate():
