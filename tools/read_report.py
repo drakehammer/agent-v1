@@ -1,11 +1,9 @@
-"""Herramienta para leer reportes JUnit XML.
-
-Soporta formato Maven Surefire: elements testsuite, testcase, failure, error,
-skipped y system-out.
-"""
+"""Herramienta para leer reportes JUnit XML (Maven Surefire)."""
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+from defusedxml import ElementTree as DefusedET
 
 from tools.security import DATA_DIR, SecurityError, validate_path
 
@@ -15,16 +13,16 @@ TOOL_SCHEMA = {
         "name": "read_report",
         "description": (
             "Lee un archivo JUnit XML en formato Maven Surefire y devuelve "
-            "la lista de tests fallidos con nombre, clase, tipo de fallo, mensaje "
-            "y stacktrace resumido (máximo 40 líneas por test). "
-            "Busca en data/samples/real/ o data/samples/synthetic/."
+            "la lista de tests fallidos con nombre (clase.metodo), tipo de fallo, "
+            "mensaje, stacktrace (max 40 líneas), exception_type del atributo type, "
+            "y contenido de system-out / system-err. No incluye skipped como fallo."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Nombre o ruta del archivo JUnit XML dentro de data/samples/. Ej: 'synthetic/test1.xml' o 'test1.xml'.",
+                    "description": "Ruta al archivo JUnit XML, relativa a data/samples/ (ej: 'synthetic/x.xml', 'x.xml', 'data/samples/synthetic/x.xml').",
                 }
             },
             "required": ["path"],
@@ -33,106 +31,93 @@ TOOL_SCHEMA = {
 }
 
 
-def _find_report(path: str) -> Path | None:
-    """Busca el archivo en data/samples/, data/samples/synthetic/ y data/samples/real/."""
-    # Try exact path first
-    try:
-        full_path = validate_path(f"samples/{path}", DATA_DIR)
-        if full_path.exists():
-            return full_path
-    except SecurityError:
-        pass
-
-    # Try synthetic/
-    try:
-        full_path = validate_path(f"samples/synthetic/{path}", DATA_DIR)
-        if full_path.exists():
-            return full_path
-    except SecurityError:
-        pass
-
-    # Try real/
-    try:
-        full_path = validate_path(f"samples/real/{path}", DATA_DIR)
-        if full_path.exists():
-            return full_path
-    except SecurityError:
-        pass
-
-    return None
+def _resolve_path(path: str) -> Path:
+    # Resolver rutas: 'synthetic/x.xml', 'x.xml', 'data/samples/synthetic/x.xml'
+    candidates = [
+        Path(path),
+        Path("data/samples/synthetic") / path,
+        Path("data/samples/real") / path,
+        Path("data/samples/synthetic") / Path(path).name,
+        Path("data/samples/real") / Path(path).name,
+    ]
+    for c in candidates:
+        resolved = c.resolve()
+        if resolved.exists():
+            # Validar que esté dentro de DATA_DIR
+            try:
+                resolved.relative_to(DATA_DIR.resolve())
+                return resolved
+            except ValueError:
+                continue
+    # Si no se encuentra, lanzar excepción
+    raise SecurityError(f"Archivo no encontrado (o fuera de datos): {path}")
 
 
 def read_report(path: str) -> list[dict]:
-    """Lee un JUnit XML y devuelve los tests fallidos.
-
-    Un test está considerado fallido si tiene un elemento <failure>, <error>
-    o <skipped>.
-    """
-    full_path = _find_report(path)
-
-    if full_path is None:
-        # Check for security violation (path traversal)
-        try:
-            validate_path(f"samples/{path}", DATA_DIR)
-        except SecurityError as e:
-            return [{"error": str(e), "type": "security"}]
-        return [{"error": f"Archivo no encontrado: {path}", "type": "file_not_found"}]
-
-    try:
-        tree = ET.parse(full_path)
-    except ET.ParseError as e:
-        return [{"error": f"Error parsing XML: {e}", "type": "parse_error"}]
-
+    full_path = _resolve_path(path)
+    # Usar defusedxml para evitar XXE
+    tree = DefusedET.parse(str(full_path))
     root = tree.getroot()
     failures = []
 
-    # Soportar <testsuites> >> <testsuite> o <testsuite> directamente
+    # Leer system-out y system-err del suite para contexto
+    suite_output = ""
+    suite_err = ""
+    for so in root.findall(".//system-out"):
+        suite_output += (so.text or "") + "\n"
+    for se in root.findall(".//system-err"):
+        suite_err += (se.text or "") + "\n"
+
     suites = root.findall(".//testsuite")
     if not suites and root.tag == "testsuite":
         suites = [root]
 
     for suite in suites:
-        suite_name = suite.get("name", "unknown")
-
         for testcase in suite.findall("testcase"):
-            test_name = testcase.get("name", "unknown")
-            classname = testcase.get("classname", suite_name)
-            full_test_name = f"{classname}.{test_name}" if classname != suite_name else test_name
+            name = testcase.get("name", "unknown")
+            classname = testcase.get("classname", "")
+            full_name = f"{classname}.{name}" if classname else name
 
             failure_elem = testcase.find("failure")
             error_elem = testcase.find("error")
+
+            # No incluir skipped como fallo
             skipped_elem = testcase.find("skipped")
+            if skipped_elem is not None:
+                continue
 
             entry = {
-                "test": full_test_name,
+                "test": full_name,
                 "classname": classname,
-                "name": test_name,
+                "name": name,
+                "kind": None,
+                "message": "",
+                "exception_type": "",
+                "stacktrace": "",
+                "system_out": suite_output[:2000],
+                "system_err": suite_err[:2000],
             }
 
             if failure_elem is not None:
-                entry["type"] = "failure"
-                entry["message"] = failure_elem.get("message", "") or failure_elem.text or ""
+                entry["kind"] = "failure"
+                entry["message"] = failure_elem.get("message", "") or (failure_elem.text or "")
+                entry["exception_type"] = failure_elem.get("type", "")
                 entry["stacktrace"] = _extract_stacktrace(failure_elem, 40)
                 failures.append(entry)
             elif error_elem is not None:
-                entry["type"] = "error"
-                entry["message"] = error_elem.get("message", "") or error_elem.text or ""
+                entry["kind"] = "error"
+                entry["message"] = error_elem.get("message", "") or (error_elem.text or "")
+                entry["exception_type"] = error_elem.get("type", "")
                 entry["stacktrace"] = _extract_stacktrace(error_elem, 40)
-                failures.append(entry)
-            elif skipped_elem is not None:
-                entry["type"] = "skipped"
-                entry["message"] = skipped_elem.get("message", "") or ""
-                entry["stacktrace"] = ""
                 failures.append(entry)
 
     return failures
 
 
-def _extract_stacktrace(elem: ET.Element, max_lines: int = 40) -> str:
-    """Extrae el stacktrace de un elemento de fallo/error, limitado a max_lines."""
-    text = elem.text or ""
-    lines = [l for l in text.split("\n") if l.strip()]
+def _extract_stacktrace(elem, max_lines: int = 40) -> str:
+    text = (elem.text or "")
+    lines = [l for l in text.splitlines() if l.strip()]
     if len(lines) > max_lines:
         lines = lines[:max_lines]
-        lines.append(f"... ({len(text.split(chr(10)))} líneas totales)")
+        lines.append(f"... ({len(text.splitlines())} líneas totales)")
     return "\n".join(lines)

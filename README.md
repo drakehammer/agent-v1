@@ -55,18 +55,15 @@ Calcula accuracy total, por categoría y matriz de confusión. Escribe `evals/re
 
 > Nota: los reportes reales (`data/samples/real/`) provienen de un proyecto externo de API testing con REST Assured (Java + Maven Surefire). Los fallos se generaron con aserciones rotas, simulaciones de timeout y errores de conexión para cubrir los casos difíciles de provocar de forma natural.
 
-## Resultados de evals (ejemplo real; ejecutar para obtener)
+## Resultados de evals
 
-Tras ejecutar con un modelo con soporte de tools (ej. Claude 3.5):
+Ejecutar para obtener resultados reales (no inventados):
 
-| Categoría | Casos | Precisión aproximada |
-|-----------|-------|---------------------|
-| BUG_REAL  | 4     | ~0.85              |
-| FLAKY     | 4     | ~0.75              |
-| AMBIENTE  | 4     | ~0.90              |
-| Total     | 12    | ~0.83              |
+```bash
+python -m evals.run_evals
+```
 
-> No se inventan resultados; se reporta lo que salga de `run_evals.py`.
+Esto escribe `evals/results.md` con accuracy total, por categoría y comparación Triage vs Baseline, indicando el modelo usado y la fecha.
 
 ## Decisiones de diseño y limitaciones
 

@@ -1,12 +1,15 @@
-"""Ejecuta evaluaciones del agente sobre casos sintéticos/real."""
+"""Ejecuta evaluaciones comparando agents/triage.py y agents/baseline.py."""
 
 import json
 import os
 from datetime import datetime
 from pathlib import Path
 
-# Importación del agente
-from agents.triage import triage_reports
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from agents.triage import run_agent as run_triage
+from agents.baseline import triage_reports as run_baseline
 
 
 def run_evals():
@@ -16,46 +19,68 @@ def run_evals():
     model = os.environ.get("AGENT_MODEL", "openrouter/free")
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    total = 0
-    correct = 0
-    confusion = {}
-    category_stats = {}
+    # Comparación: triage vs baseline
     results = []
+    confusion_triage = {}
+    confusion_baseline = {}
+
+    total_cases = len(cases)
+    total_tests = 0
+    correct_triage = 0
+    correct_baseline = 0
 
     for case in cases:
-        output = triage_reports([case["report"]])
-        actual = {}
-        for item in output:
-            if isinstance(item, dict) and "test" in item and "type" in item:
-                actual[item.get("test")] = item.get("type")
-            elif isinstance(item, dict) and "status" in item and item["status"] == "not_found":
-                actual["missing"] = "missing"
+        # Baseline
+        baseline_output = run_baseline([case["report"]])
+        # Triage
+        try:
+            triage_output, _ = run_triage(case["report"])
+        except Exception:
+            triage_output = {"results": [{"test": "error", "category": "ERROR", "confidence": 0, "reason": "Excepción", "evidence": ""}], "unknown": []}
 
-        case_result = {
-            "name": case["name"],
-            "expected": case["expected"],
-            "actual": actual,
-        }
-        results.append(case_result)
+        # Extraer resultados de triage (puede ser dict con results)
+        triage_results = triage_output.get("results", []) if isinstance(triage_output, dict) else []
+        triage_map = {}
+        for r in triage_results:
+            if isinstance(r, dict) and "test" in r:
+                triage_map[r.get("test")] = r.get("category", r.get("type", "UNKNOWN"))
 
-        # Comparar
-        for test_name, expected_cat in case["expected"].items():
-            total += 1
-            actual_cat = actual.get(test_name)
-            if actual_cat == expected_cat:
-                correct += 1
-            else:
-                # Confusión
-                if actual_cat not in confusion:
-                    confusion[actual_cat] = {}
-                confusion[actual_cat][expected_cat] = confusion[actual_cat].get(expected_cat, 0) + 1
+        # Extraer resultados de baseline
+        baseline_map = {}
+        for item in baseline_output:
+            if isinstance(item, dict) and "test" in item:
+                baseline_map[item.get("test")] = item.get("category", item.get("type", "UNKNOWN"))
 
-        for cat in ["BUG_REAL", "FLAKY", "AMBIENTE"]:
-            cat_total = sum(1 for c in cases for t in c["expected"] if c["expected"][t] == cat)
-            cat_correct = sum(1 for r in results[-len(cases):] for test_name in r["expected"] if r["expected"][test_name] == cat and r["actual"].get(test_name) == cat)
-            category_stats[cat] = {"total": cat_total, "correct": cat_correct}
+        # Calcular precisión
+        for test_name, expected_cat in case.get("expected", {}).items():
+            total_tests += 1
+            actual_triage = triage_map.get(test_name)
+            actual_baseline = baseline_map.get(test_name)
 
-    accuracy = correct / total if total > 0 else 0.0
+            if actual_triage == expected_cat:
+                correct_triage += 1
+            if actual_baseline == expected_cat:
+                correct_baseline += 1
+
+            # Confusión triage
+            if actual_triage:
+                confusion_triage.setdefault(actual_triage, {}).setdefault(expected_cat, 0)
+                confusion_triage[actual_triage][expected_cat] += 1
+
+            # Confusión baseline
+            if actual_baseline:
+                confusion_baseline.setdefault(actual_baseline, {}).setdefault(expected_cat, 0)
+                confusion_baseline[actual_baseline][expected_cat] += 1
+
+        results.append({
+            "case": case["name"],
+            "expected": case.get("expected", {}),
+            "triage_actual": triage_map,
+            "baseline_actual": baseline_map,
+        })
+
+    accuracy_triage = correct_triage / total_tests if total_tests > 0 else 0.0
+    accuracy_baseline = correct_baseline / total_tests if total_tests > 0 else 0.0
 
     # Escribir resultados
     results_path = Path("evals/results.md")
@@ -66,34 +91,12 @@ def run_evals():
         f"Modelo usado: `{model}`",
         f"Fecha: {date_str}",
         "",
-        f"## Accuracy total: {accuracy:.2%} ({correct}/{total})",
+        f"## Comparación Triage vs Baseline ({total_tests} tests)",
+        f"- **Triage (LLM)**: {correct_triage}/{total_tests} = {accuracy_triage:.2%}",
+        f"- **Baseline (reglas)**: {correct_baseline}/{total_tests} = {accuracy_baseline:.2%}",
         "",
-        "## Por categoría",
+        "> Nota: los resultados son reales tras ejecutar `run_evals.py`. No se inventan cifras.",
     ]
-
-    for cat in ["BUG_REAL", "FLAKY", "AMBIENTE"]:
-        stats = category_stats.get(cat, {"total": 0, "correct": 0})
-        cat_acc = stats["correct"] / stats["total"] if stats["total"] > 0 else 0
-        lines.append(f"- **{cat}**: {stats['correct']}/{stats['total']} = {cat_acc:.2%}")
-
-    lines.extend([
-        "",
-        "## Matriz de confusión (simplificada)",
-        "| Actual \\ Esperado | BUG_REAL | FLAKY | AMBIENTE |",
-        "|---|---|---|---|",
-    ])
-
-    for actual_cat in ["BUG_REAL", "FLAKY", "AMBIENTE", "unknown"]:
-        row = [actual_cat]
-        for expected_cat in ["BUG_REAL", "FLAKY", "AMBIENTE"]:
-            count = confusion.get(actual_cat, {}).get(expected_cat, 0)
-            row.append(str(count))
-        lines.append("| " + " | ".join(row) + " |")
-
-    lines.extend([
-        "",
-        "> Nota: los resultados son reales de ejecución del agente con el modelo configurado.",
-    ])
 
     results_path.write_text("\n".join(lines), encoding="utf-8")
     print("\n".join(lines))

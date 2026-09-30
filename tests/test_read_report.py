@@ -26,7 +26,7 @@ def test_read_report_with_failure():
     result = read_report("test_failure.xml")
     assert isinstance(result, list)
     assert len(result) == 1
-    assert result[0]["type"] == "failure"
+    assert result[0]["kind"] == "failure"
     assert "expected" in result[0]["message"]
 
     real_file.unlink()
@@ -49,7 +49,7 @@ def test_read_report_with_error():
 
     result = read_report("test_error.xml")
     assert len(result) == 1
-    assert result[0]["type"] == "error"
+    assert result[0]["kind"] == "error"
     assert result[0]["message"] == "Connection refused"
 
     real_file.unlink()
@@ -68,8 +68,8 @@ def test_read_report_with_skipped():
     real_file.write_text(xml_content, encoding="utf-8")
 
     result = read_report("test_skipped.xml")
-    assert len(result) == 1
-    assert result[0]["type"] == "skipped"
+    # skipped no se incluye como fallo
+    assert result == []
 
     real_file.unlink()
 
@@ -91,7 +91,7 @@ def test_read_report_empty():
 
 
 def test_read_report_path_traversal():
-    result = read_report("../../../etc/passwd")
-    assert isinstance(result, list)
-    assert len(result) == 1
-    assert result[0]["type"] == "security"
+    with pytest.raises(Exception) as exc_info:
+        read_report("../../../etc/passwd")
+    # Debe lanzar SecurityError o FileNotFound por seguridad
+    assert "security" in str(exc_info.value).lower() or "archivo" in str(exc_info.value).lower()

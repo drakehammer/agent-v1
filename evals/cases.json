@@ -2,85 +2,61 @@
   {
     "name": "bug_real_assertion",
     "report": "synthetic/bug_real_assertion.xml",
-    "expected": {
-      "ApiTest.testGetUser": "BUG_REAL"
-    }
+    "expected": {"ApiTest.testGetUser": "BUG_REAL"}
   },
   {
     "name": "bug_real_wrong_value",
     "report": "synthetic/bug_real_wrong_value.xml",
-    "expected": {
-      "ApiTest.testGetUser": "BUG_REAL"
-    }
+    "expected": {"ApiTest.testGetUser": "BUG_REAL"}
   },
   {
     "name": "bug_real_status_code",
     "report": "synthetic/bug_real_status_code.xml",
-    "expected": {
-      "ApiTest.testGetUser": "BUG_REAL"
-    }
+    "expected": {"ApiTest.testGetUser": "BUG_REAL"}
   },
   {
     "name": "bug_real_field_null",
     "report": "synthetic/bug_real_field_null.xml",
-    "expected": {
-      "ApiTest.testGetUser": "BUG_REAL"
-    }
+    "expected": {"ApiTest.testGetUser": "BUG_REAL"}
   },
   {
     "name": "flaky_timeout",
     "report": "synthetic/flaky_timeout.xml",
-    "expected": {
-      "ApiTest.testGetUser": "FLAKY"
-    }
+    "expected": {"ApiTest.testGetUser": "FLAKY"}
   },
   {
     "name": "flaky_race_condition",
     "report": "synthetic/flaky_race_condition.xml",
-    "expected": {
-      "ApiTest.testGetUser": "FLAKY"
-    }
+    "expected": {"ApiTest.testGetUser": "FLAKY"}
   },
   {
     "name": "flaky_order_dependent",
     "report": "synthetic/flaky_order_dependent.xml",
-    "expected": {
-      "ApiTest.testGetUser": "FLAKY"
-    }
+    "expected": {"ApiTest.testGetUser": "FLAKY"}
   },
   {
     "name": "flaky_intermittent",
     "report": "synthetic/flaky_intermittent.xml",
-    "expected": {
-      "ApiTest.testGetUser": "FLAKY"
-    }
+    "expected": {"ApiTest.testGetUser": "FLAKY"}
   },
   {
     "name": "ambiente_connection_refused",
     "report": "synthetic/ambiente_connection_refused.xml",
-    "expected": {
-      "ApiTest.testGetUser": "AMBIENTE"
-    }
+    "expected": {"ApiTest.testGetUser": "AMBIENTE"}
   },
   {
     "name": "ambiente_dns",
     "report": "synthetic/ambiente_dns.xml",
-    "expected": {
-      "ApiTest.testGetUser": "AMBIENTE"
-    }
+    "expected": {"ApiTest.testGetUser": "AMBIENTE"}
   },
   {
     "name": "ambiente_credentials",
     "report": "synthetic/ambiente_credentials.xml",
-    "expected": {
-      "ApiTest.testGetUser": "AMBIENTE"
-    }
+    "expected": {"ApiTest.testGetUser": "AMBIENTE"}
   },
   {
     "name": "ambiente_service_down",
     "report": "synthetic/ambiente_service_down.xml",
-    "expected": {
-      "ApiTest.testGetUser": "AMBIENTE"
-    }
+    "expected": {"ApiTest.testGetUser": "AMBIENTE"}
   }
 ]

@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from tools.security import OUTPUT_DIR, SecurityError, validate_path
+import tools.security as security
+from tools.security import SecurityError, validate_path
 
 TOOL_SCHEMA = {
     "type": "function",
@@ -40,12 +41,12 @@ def write_summary(path: str, content: str) -> dict:
         return {"error": "Solo se permiten archivos .md", "success": False}
 
     try:
-        full_path = validate_path(path, OUTPUT_DIR)
+        full_path = validate_path(path, security.OUTPUT_DIR)
     except SecurityError as e:
         return {"error": str(e), "success": False}
 
     try:
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        security.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         full_path.write_text(content, encoding="utf-8")
         return {"success": True, "path": str(full_path)}
     except Exception as e:
