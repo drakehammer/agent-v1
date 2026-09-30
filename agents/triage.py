@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Agente de triage con ciclo manual de tool calling (OpenRouter + openai SDK)."""
 
+from dotenv import load_dotenv
+load_dotenv()
 import json
 import os
 import time
@@ -106,7 +108,7 @@ def run_agent(report_path_str: str) -> tuple[dict, dict]:
     # Resolver fallos del reporte para validación de cantidad exacta y fallback
     expected_test_names = set()
     try:
-        failed_report = read_report(str(report_path_str))
+        failed_report = read_report(str(full_report_path))
         expected_test_names = {f.get("test") for f in failed_report if f.get("test")}
     except Exception:
         pass

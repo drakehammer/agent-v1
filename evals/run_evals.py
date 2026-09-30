@@ -8,6 +8,9 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from agents.triage import run_agent as run_triage
 from agents.baseline import triage_reports as run_baseline
 
@@ -32,6 +35,7 @@ def run_evals():
     invalid_output_triage = 0
     total_tool_calls_triage = 0
     total_time_triage = 0.0
+    execution_errors_global = []
 
     for case in cases:
         # Baseline
@@ -40,8 +44,8 @@ def run_evals():
         try:
             triage_output, trace_info = run_triage(case["report"])
         except Exception as exc:
-            triage_output = {"results": [{"test_name": case["report"], "category": "ERROR", "confidence": 0, "reason": "Excepción", "evidence": [str(exc)]}], "unknown": []}
-            trace_info = {"iterations": 0, "tool_calls": [], "total_time": 0.0}
+            triage_output = {"results": [{"test_name": case["report"], "category": "execution_error", "confidence": 0, "reason": "Ejecución fallida: " + str(exc), "evidence": [str(exc)]}], "unknown": []}
+            trace_info = {"iterations": 0, "tool_calls": [], "total_time": 0.0, "execution_error": str(exc)}
 
         # Separar evaluación de reparación: si hubo errores de validación o estructura rota, contar como invalid-output
         invalid_output_flag = False
@@ -71,6 +75,11 @@ def run_evals():
                 key = r.get("test_name") or r.get("test", "unknown")
                 triage_map[key] = r.get("category", r.get("type", "UNKNOWN"))
 
+        # Registrar errores de ejecución claramente
+        for r in triage_results:
+            if isinstance(r, dict) and r.get("category") == "execution_error":
+                execution_errors_global.append({"case": case["name"], "test": r.get("test_name") or r.get("test") or case["report"], "reason": r.get("reason", "Ejecución fallida")})
+
         # Extraer resultados de baseline
         baseline_map = {}
         for item in baseline_output:
@@ -88,13 +97,13 @@ def run_evals():
             if actual_baseline == expected_cat:
                 correct_baseline += 1
 
-            # Confusión triage
-            if actual_triage:
+            # Confusión triage (sin execution_error)
+            if actual_triage and actual_triage != "execution_error":
                 confusion_triage.setdefault(actual_triage, {}).setdefault(expected_cat, 0)
                 confusion_triage[actual_triage][expected_cat] += 1
 
             # Confusión baseline
-            if actual_baseline:
+            if actual_baseline and actual_baseline != "execution_error":
                 confusion_baseline.setdefault(actual_baseline, {}).setdefault(expected_cat, 0)
                 confusion_baseline[actual_baseline][expected_cat] += 1
 
@@ -151,19 +160,35 @@ def run_evals():
     results_path = Path("evals/results.md")
     results_path.parent.mkdir(parents=True, exist_ok=True)
 
+    real_eval = total_tool_calls_triage > 0 and total_time_triage > 0
+    accuracy_text_triage = f"{correct_triage}/{total_tests} = {accuracy_triage:.2%}" if real_eval else "No calculado (evaluación no real: tool_calls == 0 o time == 0)"
+    accuracy_text_baseline = f"{correct_baseline}/{total_tests} = {accuracy_baseline:.2%}" if real_eval else "No calculado"
+
     lines = [
         "# Resultados de Evaluación",
         f"Modelo usado: `{model}`",
         f"Fecha: {date_str}",
         "",
         f"## Comparación Triage vs Baseline ({total_tests} tests)",
-        f"- **Triage (LLM)**: {correct_triage}/{total_tests} = {accuracy_triage:.2%}",
-        f"- **Baseline (reglas)**: {correct_baseline}/{total_tests} = {accuracy_baseline:.2%}",
+        f"- **Triage (LLM)**: {accuracy_text_triage}",
+        f"- **Baseline (reglas)**: {accuracy_text_baseline}",
         f"- **Unknown rate (Triage)**: {unknown_rate:.2%}",
         f"- **Invalid-output rate (Triage)**: {invalid_output_rate:.2%}",
         f"- **Average tool calls (Triage)**: {avg_tool_calls:.1f}",
         f"- **Average execution time (Triage)**: {avg_time:.2f}s",
         "",
+    ]
+    if not real_eval:
+        lines.append("> WARNING: Evaluacion no considerada real: no se registraron llamadas a herramientas (tool_calls == 0) o tiempo == 0.")
+        lines.append("")
+    if execution_errors_global:
+        lines.append("## Errores de ejecución")
+        lines.append("| Caso | Test | Razón |")
+        lines.append("|------|------|-------|")
+        for err in execution_errors_global:
+            lines.append(f"| {err['case']} | {err['test']} | {err['reason']} |")
+        lines.append("")
+    lines += [
         "## Matriz de confusión (Triage)",
         "```",
         "Predicted \\ Expected  " + "  ".join(f"{cat:>4}" for cat in categories),

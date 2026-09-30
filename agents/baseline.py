@@ -1,6 +1,8 @@
 """Baseline: clasificador de reglas fijas (para comparación con triage)."""
 
 from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv()
 from tools.read_report import read_report
 
 
@@ -43,16 +45,29 @@ def triage_reports(report_paths: list[str]) -> list[dict]:
     for report_path in report_paths:
         full_path = None
         # Resolver ruta con soporte para 'synthetic/x.xml', 'x.xml', 'data/samples/synthetic/x.xml'
-        for base in [Path("data/samples/synthetic"), Path("data/samples/real"), Path(".")]:
-            p = (base / report_path).resolve()
-            if p.exists():
-                full_path = p
-                break
-        if full_path is None:
-            # Intentar con nombre directo
-            p = Path(report_path).resolve()
-            if p.exists():
-                full_path = p
+        p = Path(report_path)
+        if p.exists():
+            full_path = p.resolve()
+        else:
+            for base in [Path("data/samples/synthetic"), Path("data/samples/real")]:
+                direct = base / p
+                if direct.exists():
+                    full_path = direct.resolve()
+                    break
+                by_name = base / p.name
+                if by_name.exists():
+                    full_path = by_name.resolve()
+                    break
+            if full_path is None:
+                # Intentar con nombre directo en directorio actual
+                by_name_current = Path(p.name)
+                if by_name_current.exists():
+                    full_path = by_name_current.resolve()
+        if full_path is None or not full_path.exists():
+            # Último intento: nombre directo sin base
+            p_direct = Path(report_path).resolve()
+            if p_direct.exists():
+                full_path = p_direct
 
         if full_path is None or not full_path.exists():
             results.append({"test": str(report_path), "category": "NOT_FOUND",
@@ -61,7 +76,7 @@ def triage_reports(report_paths: list[str]) -> list[dict]:
             continue
 
         try:
-            failed = read_report(str(report_path))
+            failed = read_report(str(full_path))
         except Exception as e:
             results.append({"test": str(report_path), "category": "ERROR",
                             "confidence": 0.0, "reason": str(e), "evidence": str(e)})
