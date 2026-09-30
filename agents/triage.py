@@ -13,12 +13,19 @@ ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(dotenv_path=ENV_FILE, override=False)
 
 from openai import OpenAI
+import openai as openai_mod
 
 from agents.schema import TriageOutput, ResultItem
 from tools import TOOL_SCHEMAS
 from tools.read_report import read_report
 from tools.read_test import read_test
 from tools.write_summary import write_summary
+
+class DailyLimitError(Exception):
+    def __init__(self, reset_time_local: str = ""):
+        self.reset_time_local = reset_time_local
+        super().__init__(f"Límite diario alcanzado. Reinicio: {reset_time_local}")
+
 
 MAX_ITERATIONS = 10
 MAX_RETRIES = 3
@@ -31,6 +38,62 @@ SYSTEM_PROMPT = (
     "Genera una respuesta final estructurada como JSON con 'results' (lista de objetos con test_name, category, confidence, reason, evidence). "
     "Incluye un campo 'summary' breve sobre el diagnóstico general. No uses regex ni texto libre fuera del JSON estructurado."
 )
+
+
+def _is_daily_limit_429(exc: Exception) -> bool:
+    status_code = getattr(exc, "status_code", None)
+    if status_code != 429:
+        return False
+    body = getattr(exc, "body", None)
+    msg = ""
+    metadata = {}
+    if isinstance(body, dict):
+        msg = body.get("message", "")
+        metadata = body.get("metadata", {})
+    elif isinstance(body, str):
+        msg = body
+    msg += " " + (getattr(exc, "message", "") or "")
+    msg_lower = msg.lower()
+    is_daily = False
+    if isinstance(metadata, dict):
+        if metadata.get("limit_source") == "openrouter_free_tier_daily":
+            is_daily = True
+    if not is_daily:
+        if "free-models-per-day" in msg_lower or "free tier daily" in msg_lower or "daily limit" in msg_lower:
+            is_daily = True
+        if "limit_source" in msg_lower and "openrouter_free_tier_daily" in msg_lower:
+            is_daily = True
+    # Según instrucciones: solo no reintentar si mensaje/metadata indica límite diario.
+    return is_daily
+
+
+def _get_retry_after_seconds(exc: Exception) -> float | None:
+    response_obj = getattr(exc, "response", None)
+    if response_obj is not None:
+        headers = getattr(response_obj, "headers", None) or {}
+        raw = headers.get("retry-after") or headers.get("Retry-After")
+        if raw is not None:
+            try:
+                return float(raw)
+            except Exception:
+                pass
+    return None
+
+
+def _get_rate_limit_reset_local(exc: Exception) -> str:
+    response_obj = getattr(exc, "response", None)
+    reset_local = ""
+    reset_raw = None
+    if response_obj is not None:
+        headers = getattr(response_obj, "headers", None) or {}
+        reset_raw = headers.get("x-ratelimit-reset") or headers.get("X-RateLimit-Reset")
+    if reset_raw is not None:
+        try:
+            reset_ms = int(reset_raw)
+            reset_local = datetime.fromtimestamp(reset_ms / 1000.0).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+    return reset_local
 
 
 def call_api_with_retry(client: OpenAI, model: str, messages: list, tools: list) -> dict:
@@ -46,8 +109,52 @@ def call_api_with_retry(client: OpenAI, model: str, messages: list, tools: list)
             return response
         except Exception as exc:
             last_exc = exc
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(2 ** attempt)
+            status_code = getattr(exc, "status_code", None)
+            exc_class = type(exc).__name__
+            is_network_error = exc_class in (
+                "APITimeoutError", "APIConnectionError", "TimeoutError"
+            ) or (isinstance(exc, (openai_mod.APITimeoutError, openai_mod.APIConnectionError)) if openai_mod else False)
+
+            # No reintentar 401 ni 400 nunca
+            if status_code in (401, 400):
+                raise
+
+            # 429: verificar límite diario
+            if status_code == 429:
+                if _is_daily_limit_429(exc):
+                    reset_local = _get_rate_limit_reset_local(exc)
+                    raise DailyLimitError(reset_time_local=reset_local)
+                # Es 429 transitorio; reintentar con Retry-After
+                if attempt < MAX_RETRIES - 1:
+                    retry_after = _get_retry_after_seconds(exc)
+                    sleep_time = retry_after if retry_after is not None else (2 ** attempt)
+                    time.sleep(sleep_time)
+                    continue
+                else:
+                    raise last_exc
+
+            # 5xx: reintentar
+            if status_code is not None and status_code >= 500:
+                if attempt < MAX_RETRIES - 1:
+                    retry_after = _get_retry_after_seconds(exc)
+                    sleep_time = retry_after if retry_after is not None else (2 ** attempt)
+                    time.sleep(sleep_time)
+                    continue
+                else:
+                    raise last_exc
+
+            # Timeout / errores de red: reintentar
+            if is_network_error:
+                if attempt < MAX_RETRIES - 1:
+                    retry_after = _get_retry_after_seconds(exc)
+                    sleep_time = retry_after if retry_after is not None else (2 ** attempt)
+                    time.sleep(sleep_time)
+                    continue
+                else:
+                    raise last_exc
+
+            # Cualquier otro error no se reintenta
+            raise
     raise last_exc
 
 
