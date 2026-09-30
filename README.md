@@ -35,10 +35,11 @@ graph TD
 cp .env.example .env
 # Editar .env
 OPENROUTER_API_KEY=sk-...
-AGENT_MODEL=openrouter/free
+# Elige un modelo con soporte de tools en https://openrouter.ai/models y fija un ID concreto; openrouter/free rota de modelo y vuelve las evals no reproducibles
+AGENT_MODEL=<id-de-modelo-con-soporte-de-tools>
 ```
 
-- El modelo debe soportar `tools` (function calling). `openrouter/free` o `openrouter/anthropic/claude-3.5-sonnet` funcionan.
+- El modelo debe soportar `tools` (function calling). Elige un ID concreto en https://openrouter.ai/models; `openrouter/free` rota de modelo y vuelve las evals no reproducibles.
 - El SDK `openai` apunta a `base_url="https://openrouter.ai/api/v1"`.
 - Nunca se imprime ni guarda la clave en trazas.
 

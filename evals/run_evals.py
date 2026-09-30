@@ -18,6 +18,34 @@ from agents.baseline import triage_reports as run_baseline
 
 
 def run_evals():
+    api_key = (os.environ.get("OPENROUTER_API_KEY") or "").strip()
+    if not api_key:
+        print("ERROR: OPENROUTER_API_KEY no está configurada. Crea .env o define la variable de entorno antes de correr las evals.")
+        # No escribir results.md engañoso; solo mostrar baseline si es posible sin API
+        # El baseline no requiere API; calculamos y mostramos
+        try:
+            with open("evals/cases.json", encoding="utf-8") as f:
+                cases = json.load(f)
+            from agents.baseline import triage_reports as run_baseline
+            total_tests = 0
+            correct_baseline = 0
+            for case in cases:
+                baseline_output = run_baseline([case["report"]])
+                baseline_map = {}
+                for item in baseline_output:
+                    if isinstance(item, dict) and "test" in item:
+                        baseline_map[item.get("test")] = item.get("category", item.get("type", "UNKNOWN"))
+                for test_name, expected_cat in case.get("expected", {}).items():
+                    total_tests += 1
+                    if baseline_map.get(test_name) == expected_cat:
+                        correct_baseline += 1
+            accuracy_text = f"{correct_baseline}/{total_tests} = {correct_baseline/total_tests:.2%}" if total_tests else "N/A"
+            print(f"Baseline (sin API): {accuracy_text}")
+            print("No se calculó Triage (LLM): falta OPENROUTER_API_KEY.")
+        except Exception as exc:
+            print(f"No se pudo calcular ni baseline: {exc}")
+        return
+
     with open("evals/cases.json", encoding="utf-8") as f:
         cases = json.load(f)
 

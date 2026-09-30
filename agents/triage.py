@@ -80,7 +80,8 @@ def run_agent(report_path_str: str) -> tuple[dict, dict]:
     api_key = (os.environ.get("OPENROUTER_API_KEY") or "").strip()
     model = os.environ.get("AGENT_MODEL", "openrouter/free")
     if not api_key:
-        raise ValueError("OPENROUTER_API_KEY no está configurada. Crea .env en la raíz del repositorio o define la variable de entorno.")
+        print("ERROR: OPENROUTER_API_KEY no está configurada. Crea .env en la raíz del repositorio o define la variable de entorno.", file=sys.stderr)
+        sys.exit(1)
 
     client = OpenAI(
         api_key=api_key,
