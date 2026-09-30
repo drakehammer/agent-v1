@@ -9,7 +9,7 @@ Clasifica cada test fallido de un reporte JUnit XML (formato Maven Surefire) en 
 - **AMBIENTE**
 - **UNKNOWN** (evidencia insuficiente o varias explicaciones plausibles)
 
-- **BUG_REAL**: Asserción falla por valor incorrecto del sistema (404 en lugar de 200, campo null, etc.). Reproducible y consistente.
+- **BUG_REAL**: Aserción falla por valor incorrecto del sistema (404 en lugar de 200, campo null, etc.). Reproducible y consistente.
 - **FLAKY**: Fallo intermitente o dependiente del tiempo/orden (timeouts, race conditions, datos compartidos).
 - **AMBIENTE**: Problemas de infraestructura (DNS, conexión rechazada, credenciales expiradas, 503, servicio caído).
 
@@ -19,14 +19,12 @@ Genera un JSON estructurado por test (`test_name`, `category`, `confidence`, `re
 
 ```mermaid
 graph TD
-    A[Report JUnit XML] --> B[read_report]
-    B --> C[Lista de fallidos]
-    C --> D[Agent triage.py]
-    D --> E{Tool calling manual}
-    E --> F[read_report / read_test / write_summary]
-    F --> G[Clasificación JSON]
-    G --> H[Resumen Markdown]
-    H --> I[Traces / output/]
+    A[Report JUnit XML] --> B[Agent triage.py]
+    B --> C{Tool calling manual}
+    C --> D[read_report / read_test / write_summary]
+    D --> E[Clasificación JSON]
+    E --> F[Resumen Markdown]
+    F --> G[Traces / output/]
 ```
 
 ## Configuración OpenRouter
@@ -59,7 +57,7 @@ python -m evals.run_evals
 
 Calcula accuracy total, por categoría y matriz de confusión. Escribe `evals/results.md` con modelo usado y fecha.
 
-> Nota: los reportes reales (`data/samples/real/`) provienen de un proyecto externo de API testing con REST Assured (Java + Maven Surefire). Los fallos se generaron con aserciones rotas, simulaciones de timeout y errores de conexión para cubrir los casos difíciles de provocar de forma natural.
+> Nota sobre `data/samples/real/`: la carpeta existe; cada XML se generó con REST Assured (Java + Maven Surefire) a partir de un proyecto externo de API testing, simulando fallos reales (aserções rotas, timeouts, errores de conexión, servicios caídos). Actualmente no contiene archivos; agregar reportes reales del proyecto externo cuando estén disponibles.
 
 ## Resultados de evals
 
@@ -69,7 +67,7 @@ Ejecutar para obtener resultados reales (no inventados):
 python -m evals.run_evals
 ```
 
-Esto escribe `evals/results.md` con accuracy total, por categoría y comparación Triage vs Baseline, indicando el modelo usado y la fecha.
+Esto escribe `evals/results.md` con accuracy total, por categoría y comparación Triage vs Baseline, indicando el modelo usado y la fecha. El archivo `evals/results.md` debe copiarse a esta sección tras ejecutar `python -m evals.run_evals`, incluyendo siempre el baseline real (aunque sea bajo) sin inventar cifras.
 
 ## Decisiones de diseño y limitaciones
 
@@ -80,3 +78,7 @@ Esto escribe `evals/results.md` con accuracy total, por categoría y comparació
 - **Traces**: cada ejecución guarda `entrada`, `modelo`, mensajes, llamadas a herramientas con args/resultados, iteraciones, tiempo y salida.
 - **Limitación**: el agente necesita evidencia suficiente para clasificar; si no alcanza, usa `unknown` en lugar de inventar.
 - **Real vs sintético**: los reportes reales (`real/`) provienen de un proyecto de integración con REST Assured; los sintéticos cubren timeouts, race conditions, orden de ejecución, conexión rechazada, DNS, credenciales expiradas y servicio caído.
+
+## Baseline vs LLM
+
+El baseline (`agents/baseline.py`) es un clasificador de reglas fijas (excepción + mensaje) que sirve como punto de comparación objetivo. Se evalúa siempre, sin depender de la API, y su accuracy real se reporta en `evals/results.md`. El LLM (`triage.py`) debe superar o al menos acercarse al baseline; si hay errores de ejecución o falta de datos, se marca como "No calculado" con el motivo, sin ocultar el baseline ni inventar cifras.
