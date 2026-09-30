@@ -29,7 +29,7 @@ TOOL_SCHEMA = {
 
 
 def read_test(path: str) -> str:
-    """Lee un archivo de test o log y devuelve su contenido truncado."""
+    """Lee archivo fuente del test con contexto (ruta, tamaño, primeras líneas)."""
     try:
         full_path = validate_path(path, DATA_DIR)
     except SecurityError as e:
@@ -46,7 +46,8 @@ def read_test(path: str) -> str:
     except Exception as e:
         return f"Error leyendo archivo: {e}"
 
+    lines = content.splitlines()
+    header = f"--- ARCHIVO: {full_path.name} ---\nLINEAS TOTALES: {len(lines)} | CARACTERES: {len(content)}"
     if len(content) > MAX_CHARS:
-        content = content[:MAX_CHARS] + f"\n... ({len(content)} caracteres totales, truncado a {MAX_CHARS})"
-
-    return content
+        content = content[:MAX_CHARS] + f"\n... (truncado a {MAX_CHARS} caracteres; total {len(content)} antes del truncado)"
+    return f"{header}\n{content}"

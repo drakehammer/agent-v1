@@ -241,10 +241,19 @@ def run_agent(report_path_str: str) -> tuple[dict, dict]:
 
     else:
         # Se alcanzó el límite de iteraciones sin respuesta final
+        # Devolver un resultado válido para cada test analizado (F4: no ocultar con un solo item)
+        fallback_results = []
+        for tn in expected_test_names:
+            fallback_results.append({
+                "test_name": tn,
+                "category": "UNKNOWN",
+                "confidence": 0.0,
+                "reason": "Límite de iteraciones alcanzado; sin evidencia suficiente para distinguir la causa raíz.",
+                "evidence": [],
+            })
         trace["output"] = json.dumps({
-            "results": [{"test": "unknown", "category": "UNKNOWN", "confidence": 0.0,
-                         "reason": "Límite de iteraciones alcanzado sin respuesta final", "evidence": ""}],
-            "unknown": [{"test": "unknown", "reason": "Sin evidencia suficiente"}],
+            "results": fallback_results if fallback_results else [{"test_name": "unknown", "category": "UNKNOWN", "confidence": 0.0, "reason": "Límite de iteraciones alcanzado.", "evidence": []}],
+            "unknown": [],
         }, ensure_ascii=False)
 
     trace["total_time"] = time.time() - start_time
@@ -403,11 +412,13 @@ def run_agent(report_path_str: str) -> tuple[dict, dict]:
                 if not ev or not all(isinstance(e, str) and e.strip() for e in ev):
                     validation_errors.append(f"Evidencia obligatoria no vacía para {r.get('test_name')} (categoria {cat}).")
 
+        # Simplificar schema: eliminar estructura duplicada unknown
+        parsed_output.pop("unknown", None)
+
         try:
             model_name = model if 'model' in locals() else os.environ.get("AGENT_MODEL", "unknown")
             triage_model = TriageOutput(
                 results=parsed_output.get("results", []),
-                unknown=parsed_output.get("unknown", []),
                 summary=parsed_output.get("summary", ""),
                 model_used=parsed_output.get("model_used", model_name),
             )

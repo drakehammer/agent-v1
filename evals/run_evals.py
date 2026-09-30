@@ -28,15 +28,40 @@ def run_evals():
     total_tests = 0
     correct_triage = 0
     correct_baseline = 0
+    unknown_triage_count = 0
+    invalid_output_triage = 0
+    total_tool_calls_triage = 0
+    total_time_triage = 0.0
 
     for case in cases:
         # Baseline
         baseline_output = run_baseline([case["report"]])
         # Triage
         try:
-            triage_output, _ = run_triage(case["report"])
-        except Exception:
-            triage_output = {"results": [{"test": "error", "category": "ERROR", "confidence": 0, "reason": "Excepción", "evidence": ""}], "unknown": []}
+            triage_output, trace_info = run_triage(case["report"])
+        except Exception as exc:
+            triage_output = {"results": [{"test_name": case["report"], "category": "ERROR", "confidence": 0, "reason": "Excepción", "evidence": [str(exc)]}], "unknown": []}
+            trace_info = {"iterations": 0, "tool_calls": [], "total_time": 0.0}
+
+        # Separar evaluación de reparación: si hubo errores de validación o estructura rota, contar como invalid-output
+        invalid_output_flag = False
+        if isinstance(triage_output, dict):
+            if triage_output.get("_validation_errors") or ("results" not in triage_output) or not isinstance(triage_output.get("results"), list):
+                invalid_output_flag = True
+        else:
+            invalid_output_flag = True
+
+        # Acumular métricas de ejecución
+        if isinstance(trace_info, dict):
+            total_time_triage += trace_info.get("total_time", 0.0)
+            total_tool_calls_triage += len(trace_info.get("tool_calls", []))
+
+        if invalid_output_flag:
+            invalid_output_triage += 1
+        else:
+            # Solo contar unknown rate si no es inválido
+            triage_results_for_unknown = triage_output.get("results", []) if isinstance(triage_output, dict) else []
+            unknown_triage_count += sum(1 for r in triage_results_for_unknown if isinstance(r, dict) and r.get("category") == "UNKNOWN")
 
         # Extraer resultados de triage (puede ser dict con results)
         triage_results = triage_output.get("results", []) if isinstance(triage_output, dict) else []
@@ -107,9 +132,11 @@ def run_evals():
         f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
         metrics_text.append(f"| {cat} | {precision:.2%} | {recall:.2%} | {f1:.2%} |")
     
-    # Unknown rate
-    unknown_count = sum(1 for r in triage_results if isinstance(r, dict) and r.get("category") == "UNKNOWN")
-    unknown_rate = unknown_count / total_tests if total_tests > 0 else 0.0
+    # Unknown rate (acumulado en todos los casos, no solo último)
+    unknown_rate = unknown_triage_count / total_tests if total_tests > 0 else 0.0
+    invalid_output_rate = invalid_output_triage / total_cases if total_cases > 0 else 0.0
+    avg_time = total_time_triage / total_cases if total_cases > 0 else 0.0
+    avg_tool_calls = total_tool_calls_triage / total_cases if total_cases > 0 else 0.0
     
     # Resumen por caso
     metrics_text.append("\n### Resumen por caso")
@@ -133,6 +160,9 @@ def run_evals():
         f"- **Triage (LLM)**: {correct_triage}/{total_tests} = {accuracy_triage:.2%}",
         f"- **Baseline (reglas)**: {correct_baseline}/{total_tests} = {accuracy_baseline:.2%}",
         f"- **Unknown rate (Triage)**: {unknown_rate:.2%}",
+        f"- **Invalid-output rate (Triage)**: {invalid_output_rate:.2%}",
+        f"- **Average tool calls (Triage)**: {avg_tool_calls:.1f}",
+        f"- **Average execution time (Triage)**: {avg_time:.2f}s",
         "",
         "## Matriz de confusión (Triage)",
         "```",
