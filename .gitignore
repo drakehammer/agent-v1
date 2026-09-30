@@ -1,8 +1,1 @@
-.env
-traces/
-output/
-__pycache__/
-*.pyc
-.idea/
-.vscode/
-.scratch/
+evals/cache/
