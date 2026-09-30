@@ -58,5 +58,30 @@
     "name": "ambiente_service_down",
     "report": "synthetic/ambiente_service_down.xml",
     "expected": {"ApiTest.testGetUser": "AMBIENTE"}
+  },
+  {
+    "name": "ambiguous_assertion",
+    "report": "synthetic/ambiguous_assertion.xml",
+    "expected": {"AmbiguousTest.testAmbiguous": "UNKNOWN"}
+  },
+  {
+    "name": "ambiguous_timeout",
+    "report": "synthetic/ambiguous_timeout.xml",
+    "expected": {"AmbiguousTimeout.testTimeout": "UNKNOWN"}
+  },
+  {
+    "name": "ambiguous_http_error",
+    "report": "synthetic/ambiguous_http_error.xml",
+    "expected": {"AmbiguousHttp.testHttp": "UNKNOWN"}
+  },
+  {
+    "name": "multiple_failures",
+    "report": "synthetic/multiple_failures.xml",
+    "expected": {"MultiFailure.testA": "BUG_REAL", "MultiFailure.testB": "AMBIENTE"}
+  },
+  {
+    "name": "missing_context",
+    "report": "synthetic/missing_context.xml",
+    "expected": {"MissingContext.testMissing": "UNKNOWN"}
   }
 ]

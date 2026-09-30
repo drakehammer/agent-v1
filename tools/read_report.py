@@ -90,12 +90,20 @@ def read_report(path: str) -> list[dict]:
                 "test": full_name,
                 "classname": classname,
                 "name": name,
+                "duration": testcase.get("time", ""),
                 "kind": None,
                 "message": "",
                 "exception_type": "",
                 "stacktrace": "",
-                "system_out": suite_output[:2000],
-                "system_err": suite_err[:2000],
+                "system_out": (testcase.find("system-out") is not None and (testcase.find("system-out").text or "")[:2000] or suite_output[:2000]),
+                "system_err": (testcase.find("system-err") is not None and (testcase.find("system-err").text or "")[:2000] or suite_err[:2000]),
+                "suite_metadata": {
+                    "tests": suite.get("tests", ""),
+                    "failures": suite.get("failures", ""),
+                    "errors": suite.get("errors", ""),
+                    "skipped": suite.get("skipped", ""),
+                    "time": suite.get("time", ""),
+                },
             }
 
             if failure_elem is not None:

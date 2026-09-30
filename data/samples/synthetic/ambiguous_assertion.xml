@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="AmbiguousTest" tests="1" failures="1">
+  <testcase name="testAmbiguous" classname="AmbiguousTest">
+    <failure message="expected true but was false" type="AssertionError">
+      java.lang.AssertionError: expected true but was false
+    </failure>
+  </testcase>
+</testsuite>

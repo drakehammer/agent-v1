@@ -11,9 +11,8 @@ TOOL_SCHEMA = {
     "function": {
         "name": "read_test",
         "description": (
-            "Lee el contenido de un archivo de test o log (truncado a 10000 "
-            "caracteres). Útil para inspeccionar el código fuente del test o "
-            "logs cuando el reporte no proporciona suficiente evidencia."
+            "Lee el archivo fuente del test o un log y devuelve su contenido completo (truncado a 10000 "
+            "caracteres). Proporciona contexto suficiente para que el agente pueda distinguir hechos de hipótesis."
         ),
         "parameters": {
             "type": "object",

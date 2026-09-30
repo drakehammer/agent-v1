@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="MultiFailure" tests="3" failures="2" errors="0">
+  <testcase name="testA" classname="MultiFailure">
+    <failure message="Value mismatch" type="AssertionError">java.lang.AssertionError: expected 1 but was 2</failure>
+  </testcase>
+  <testcase name="testB" classname="MultiFailure">
+    <failure message="Connection refused" type="java.net.ConnectException">java.net.ConnectException: Connection refused</failure>
+  </testcase>
+  <testcase name="testC" classname="MultiFailure"/>
+</testsuite>
